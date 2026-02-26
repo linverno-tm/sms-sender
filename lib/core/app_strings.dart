@@ -16,7 +16,7 @@
   static const totalValidNumbers = 'Умумий тўғри рақамлар';
   static const totalInvalidValues = 'Умумий нотўғри қийматлар';
   static const invalidValuesHint =
-      'Нотўғри қиймат бор. Рақамни 998XXXXXXXXX ёки 9 хонали форматда киритинг.';
+      'Нотўғри қиймат бор. Қўллаб-қувватланади: XX XXX XX XX, +998 XX XXX XX XX, 998XXXXXXXXX, XXXXXXXXX.';
   static const pending = 'Кутилмоқда';
   static const inProgress = 'Юборилмоқда';
   static const sent = 'Юборилди';
@@ -43,6 +43,7 @@
   static const smsPermissionDenied = 'СМС юбориш рухсати берилмади';
   static const startSendError = 'Юборишни бошлашда хатолик юз берди';
   static const stopSendError = 'Юборишни тўхтатишда хатолик юз берди';
+  static const statusUpdateError = 'Ҳолатни янгилашда хатолик юз берди';
 
   static String sendCompleted({
     required int sentCount,

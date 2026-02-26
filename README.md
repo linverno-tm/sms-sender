@@ -1,45 +1,54 @@
-# SMS Bulk Sender (Flutter, Android)
+﻿# SMS Bulk Sender (Flutter, Android)
 
-Android-only Flutter ilova bo‘lib, fayllardan telefon raqamlarini import qiladi, validatsiya qiladi va bulk SMS yuborishni boshqaradi.
+Android uchun Flutter ilova: fayldan telefon raqamlarni import qiladi, tekshiradi va navbat bilan SMS yuboradi.
 
 ## Asosiy imkoniyatlar
 
-- `.xlsx`, `.xls`, `.csv`, `.txt` fayllardan raqamlarni import qilish
-- Telegram va boshqa ilovalardan share qilingan fayllarni qabul qilish
-- O‘zbek raqamlarini normalize qilish (`+998...`, `998...`, bo‘sh joyli formatlar)
-- Yakuniy valid format: `^998\d{9}$`
-- Barcha fayllar bo‘yicha raqamlarni birlashtirish va duplicate raqamlarni olib tashlash
-- Foreground service orqali navbatma-navbat SMS yuborish
-- Har SMS oralig‘ida 2 soniya kutish (`queue` uslubi)
-- Uzun matnlar uchun multipart yuborish
-- Progress, sent, failed, remaining holatlarini real vaqtga yaqin ko‘rsatish
-- Qurilma restart bo‘lganda yuborilmagan navbatni tiklash va davom ettirish
+- `.xlsx`, `.csv`, `.txt` dan raqam import qilish
+- Boshqa ilovalardan share qilingan fayllarni qabul qilish
+- Raqamlarni normalize qilish va deduplicate qilish
+- Native foreground service orqali bulk SMS yuborish
+- Real-time status: `sent`, `failed`, `remaining`, `percent`
+- Qurilma qayta yuklanganda kampaniyani tiklash
+
+## Qo'llab-quvvatlanadigan raqam formatlari
+
+Quyidagi formatlar qabul qilinadi:
+
+- `XX XXX XX XX`
+- `+998 XX XXX XX XX`
+- `998XXXXXXXXX`
+- `XXXXXXXXX`
+
+Yakuniy ichki format: `998XXXXXXXXX` (regex: `^998\d{9}$`).
 
 ## Texnologiyalar
 
-- Flutter (Dart, null-safety)
-- Android Kotlin native integration (`MethodChannel`)
+- Flutter (Dart)
+- Android Kotlin (`MethodChannel`)
 - `another_telephony`
 - `file_picker`
 - `receive_sharing_intent`
 - `excel`
 - `csv`
+- `archive`
+- `xml`
 - Android Foreground Service + WakeLock
-- SQLite (native) queue va status persistence
+- SQLite (native)
 
 ## Arxitektura
 
 `lib/`:
-- `models/` - domen modellari (`ImportedFile`, `SmsProgress`, ...)
-- `services/` - parser, native bulk SMS channel xizmati
+- `core/` - matnlar va global error reporting
+- `models/` - `ImportedFile`, `SmsProgress`, `ParseResult`
+- `services/` - parserlar, normalizer, native bridge
 - `pages/` - asosiy UI (`HomePage`)
-- `core/` - umumiy matnlar (`AppStrings`)
 
 `android/app/src/main/kotlin/com/example/sms/`:
-- `MainActivity.kt` - `sms_native` method channel
-- `BulkSmsForegroundService.kt` - background/sleep holatda yuborish
-- `BulkSmsRepository.kt` - SQLite orqali campaign/queue holatini saqlash
-- `BootCompletedReceiver.kt` - restartdan keyin kampaniyani davom ettirish
+- `MainActivity.kt` - `sms_native` kanal
+- `BulkSmsForegroundService.kt` - yuborish servisi
+- `BulkSmsRepository.kt` - SQLite status/queue
+- `BootCompletedReceiver.kt` - rebootdan keyin tiklash
 
 ## MethodChannel API
 
@@ -48,13 +57,10 @@ Kanal: `sms_native`
 - `startBulkSend`
   - input: `numbers: List<String>`, `message: String`
 - `stopBulkSend`
-  - input: yo‘q
 - `getBulkStatus`
   - output: `state`, `total`, `sent`, `failed`, `pending`, `currentIndex`, `currentNumber`, `message`
 
 ## Android ruxsatlar
-
-Manifestda quyidagilar ishlatiladi:
 
 - `android.permission.SEND_SMS`
 - `android.permission.FOREGROUND_SERVICE`
@@ -64,54 +70,35 @@ Manifestda quyidagilar ishlatiladi:
 
 ## Ishga tushirish
 
-1. Flutter SDK va Android SDK o‘rnatilgan bo‘lishi kerak.
-2. Loyihada:
-   - `flutter pub get`
-3. Qurilma/emulator ulang.
-4. Ilovani ishga tushiring:
-   - `flutter run`
+1. `flutter pub get`
+2. Emulator yoki qurilma ulang
+3. `flutter run`
 
-## Foydalanish oqimi
+## Oxirgi yangilanishlar (2026-02-26)
 
-1. `Телефон рақамлар файлини юклаш` tugmasi orqali fayl(lar) qo‘shing.
-2. Import qilingan fayllardagi valid/invalid natijalarni tekshiring.
-3. SMS matnini kiriting.
-4. `Юбориш` ni bosing.
-5. Zarur bo‘lsa `Тўхтатиш` bilan jarayonni to‘xtating.
-6. Ilova qayta ochilganda status panel joriy holatni avtomatik tiklaydi.
+1. Excel import mustahkamlandi:
+- `.xlsx` uchun 2 bosqichli parsing: avval `excel`, yiqilsa ZIP/XML fallback (`archive` + `xml`).
+- Noto'g'ri/parolli/buzilgan fayllar uchun aniq `FormatException` xabarlari.
+- `.xls` format alohida rad etiladi (faqat `.xlsx` tavsiya qilinadi).
 
-## Muhim eslatmalar
+2. File picker oqimi yaxshilandi:
+- `withData: false` qilindi.
+- Fayl avval `path`dan o'qiladi (Android cache faylidan), kerak bo'lsa memory bytes fallback ishlaydi.
 
-- Ilova Android platformasi uchun mo‘ljallangan.
-- Bulk SMS yuborishda operator va davlat regulyator talablari (anti-spam siyosatlari)ga amal qiling.
-- Juda katta hajmda yuborishda qurilma/ROM cheklovlari bo‘lishi mumkin.
+3. Telefon normalizer kengaytirildi:
+- Bo'sh joy, maxsus space belgilar, `+998`, `998`, 9 xonali lokal formatlar qamrab olindi.
+- `00` bilan boshlanuvchi xalqaro prefiks (`00998...`) ham normalize qilinadi.
 
-## Troubleshooting
+4. Global xato monitoring qo'shildi:
+- `FlutterError`, `PlatformDispatcher`, `runZonedGuarded` ushlanadi.
+- Xatolar logga `[APP_ERROR][context] ...` ko'rinishida chiqadi.
+- UI'da global error banner ko'rsatiladi.
 
-- `Inconsistent JVM target` xatolari chiqsa, pluginlar Kotlin/Java targetlari mosligini tekshiring.
-- Build cache muammosida `build/` va `android/.gradle/` papkalarini tozalab qayta build qiling.
-- SMS yuborilmasa, qurilma ruxsatlari (`SMS`, `Notifications`) berilganini tekshiring.
+5. Native SQLite resource leak tuzatildi:
+- `BulkSmsRepository`ga `close()` qo'shildi.
+- `MainActivity` va `BulkSmsForegroundService` lifecycle'da repository yopiladi.
 
-## Parser yangilanishlari (2026-02-26)
+## Eslatma
 
-Telefon raqam parseri quyidagicha yaxshilandi:
-
-- Quyidagi formatlar qabul qilinadi va bitta standartga keltiriladi:
-  - `+998901075508`
-  - `+998 90 107 55 08`
-  - `998901075508`
-  - `998 90 107 55 08`
-  - `90 107 55 08`
-  - `90-107-55-08`
-  - `(90) 107 55 08`
-- Yakuniy format doim `998XXXXXXXXX` (12 ta raqam).
-- Validatsiya regex: `^998\d{9}$`.
-- 9 xonali lokal formatga avtomatik `998` prefiksi qo'shiladi.
-- Barcha non-digit belgilar (`\D`) tozalanadi.
-- Oddiy space bilan birga maxsus bo'sh joy belgilar ham tozalanadi: `\u00A0`, `\u2007`, `\u202F`.
-- Excel numeric edge-case qo'llab-quvvatlanadi:
-  - `... .0` ko'rinishidagi qiymat to'g'ri butun songa aylantiriladi.
-  - E-notation qiymatlarda parse bo'lsa butun songa fallback aylantirish ishlaydi.
-- Parser oqimida har bir qiymat `toString()` orqali normalizatsiyadan o'tadi.
-- Valid raqamlar deduplicate qilinadi (`Set`), invalid qiymatlar alohida sanaladi.
-- UI'da valid/invalid sonlari aniq ko'rsatiladi va invalid holatda tushunarli kirillcha izoh chiqadi.
+- Ilova Android uchun mo'ljallangan.
+- Bulk SMS yuborishda operator va qonunchilik talablariga amal qiling.

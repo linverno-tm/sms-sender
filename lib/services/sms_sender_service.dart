@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:another_telephony/telephony.dart';
 import 'package:sms/models/sms_progress.dart';
+import 'package:sms/core/error_reporter.dart';
 
 class SmsSenderService {
   SmsSenderService({Telephony? telephony})
@@ -14,7 +15,12 @@ class SmsSenderService {
     try {
       final bool? granted = await _telephony.requestPhoneAndSmsPermissions;
       return granted ?? false;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      ErrorReporter.report(
+        error,
+        stackTrace,
+        context: 'SmsSenderService.ensurePermissions',
+      );
       return false;
     }
   }
@@ -104,7 +110,12 @@ class SmsSenderService {
         const Duration(seconds: 30),
         onTimeout: () => false,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      ErrorReporter.report(
+        error,
+        stackTrace,
+        context: 'SmsSenderService._sendSingle',
+      );
       return false;
     }
   }

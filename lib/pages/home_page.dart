@@ -1,11 +1,12 @@
 ﻿import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:sms/core/app_strings.dart';
+import 'package:sms/core/error_reporter.dart';
 import 'package:sms/models/imported_file.dart';
 import 'package:sms/models/sms_progress.dart';
 import 'package:sms/services/file_parser_service.dart';
@@ -78,7 +79,14 @@ class _HomePageState extends State<HomePage> {
         );
       }
       _lastState = status.state;
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      ErrorReporter.report(
+        error,
+        stackTrace,
+        userMessage: AppStrings.statusUpdateError,
+        context: '_refreshBulkStatus',
+      );
+    }
   }
 
   Future<void> _listenShareIntent() async {
@@ -86,7 +94,13 @@ class _HomePageState extends State<HomePage> {
       (List<SharedMediaFile> files) {
         _importSharedFiles(files);
       },
-      onError: (_) {
+      onError: (error, stackTrace) {
+        ErrorReporter.report(
+          error ?? Exception('Unknown share stream error'),
+          stackTrace ?? StackTrace.current,
+          userMessage: AppStrings.sharedFileReadError,
+          context: '_listenShareIntent.getMediaStream',
+        );
         _showError(AppStrings.sharedFileReadError);
       },
     );
@@ -97,7 +111,13 @@ class _HomePageState extends State<HomePage> {
         await _importSharedFiles(initialFiles);
       }
       await ReceiveSharingIntent.instance.reset();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      ErrorReporter.report(
+        error,
+        stackTrace,
+        userMessage: AppStrings.initialShareReadError,
+        context: '_listenShareIntent.initialMedia',
+      );
       if (!mounted) {
         return;
       }
@@ -113,7 +133,7 @@ class _HomePageState extends State<HomePage> {
     try {
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: true,
-        withData: true,
+        withData: false,
         type: FileType.custom,
         allowedExtensions: FileParserService.supportedExtensions.toList(),
       );
@@ -128,14 +148,36 @@ class _HomePageState extends State<HomePage> {
         if (path == null || path.isEmpty) {
           continue;
         }
-        final bytes = file.bytes ?? await File(path).readAsBytes();
+        Uint8List bytes;
+        try {
+          // Prefer reading directly from cached file path on Android.
+          bytes = await File(path).readAsBytes();
+        } catch (error, stackTrace) {
+          ErrorReporter.report(
+            error,
+            stackTrace,
+            userMessage: AppStrings.pickFileError,
+            context: '_pickFiles.readBytes',
+          );
+          final inMemoryBytes = file.bytes;
+          if (inMemoryBytes == null) {
+            rethrow;
+          }
+          bytes = inMemoryBytes;
+        }
         await _importSingleFile(
           path: path,
           name: file.name,
           bytes: bytes,
         );
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      ErrorReporter.report(
+        error,
+        stackTrace,
+        userMessage: AppStrings.pickFileError,
+        context: '_pickFiles',
+      );
       if (!mounted) {
         return;
       }
@@ -172,7 +214,13 @@ class _HomePageState extends State<HomePage> {
         final bytes = await file.readAsBytes();
         await _importSingleFile(path: path, name: path, bytes: bytes);
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      ErrorReporter.report(
+        error,
+        stackTrace,
+        userMessage: AppStrings.importSharedFileError,
+        context: '_importSharedFiles',
+      );
       if (!mounted) {
         return;
       }
@@ -219,7 +267,13 @@ class _HomePageState extends State<HomePage> {
         _files.add(importedFile);
         _filePaths.add(normalizedPath);
       });
-    } catch (_) {
+    } catch (error, stackTrace) {
+      ErrorReporter.report(
+        error,
+        stackTrace,
+        userMessage: _buildFileImportError(error),
+        context: '_importSingleFile',
+      );
       if (!mounted) {
         return;
       }
@@ -230,7 +284,7 @@ class _HomePageState extends State<HomePage> {
         extension: extension,
         validNumbers: <String>{},
         invalidCount: 0,
-        errorMessage: AppStrings.fileReadError,
+        errorMessage: _buildFileImportError(error),
       );
 
       setState(() {
@@ -238,6 +292,16 @@ class _HomePageState extends State<HomePage> {
         _filePaths.add(normalizedPath);
       });
     }
+  }
+
+  String _buildFileImportError(Object error) {
+    if (error is FormatException) {
+      final message = error.message.trim();
+      if (message.isNotEmpty) {
+        return message;
+      }
+    }
+    return AppStrings.fileReadError;
   }
 
   String _extractName(String name, String path) {
@@ -300,7 +364,13 @@ class _HomePageState extends State<HomePage> {
     try {
       await _nativeBulkSmsService.startBulkSend(numbers: numbers, message: message);
       await _refreshBulkStatus();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      ErrorReporter.report(
+        error,
+        stackTrace,
+        userMessage: AppStrings.startSendError,
+        context: '_sendSms',
+      );
       if (!mounted) {
         return;
       }
@@ -312,7 +382,13 @@ class _HomePageState extends State<HomePage> {
     try {
       await _nativeBulkSmsService.stopBulkSend();
       await _refreshBulkStatus();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      ErrorReporter.report(
+        error,
+        stackTrace,
+        userMessage: AppStrings.stopSendError,
+        context: '_stopSms',
+      );
       if (!mounted) {
         return;
       }

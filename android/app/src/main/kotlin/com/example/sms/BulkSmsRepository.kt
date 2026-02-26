@@ -80,6 +80,10 @@ class BulkSmsDbHelper(context: Context) :
 class BulkSmsRepository(context: Context) {
     private val helper = BulkSmsDbHelper(context.applicationContext)
 
+    fun close() {
+        helper.close()
+    }
+
     @Synchronized
     fun createNewCampaign(numbers: List<String>, message: String) {
         val db = helper.writableDatabase

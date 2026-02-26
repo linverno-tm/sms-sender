@@ -6,6 +6,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val channelName = "sms_native"
+    private val repository by lazy { BulkSmsRepository(applicationContext) }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -38,12 +39,17 @@ class MainActivity : FlutterActivity() {
                     }
 
                     "getBulkStatus" -> {
-                        val status = BulkSmsRepository(applicationContext).getStatus()
+                        val status = repository.getStatus()
                         result.success(status.toMap())
                     }
 
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    override fun onDestroy() {
+        repository.close()
+        super.onDestroy()
     }
 }

@@ -22,6 +22,10 @@ class PhoneNumberNormalizer {
       return null;
     }
 
+    if (digits.startsWith('00')) {
+      digits = digits.substring(2);
+    }
+
     if (digits.length == 10 && digits.startsWith('0')) {
       digits = digits.substring(1);
     }
