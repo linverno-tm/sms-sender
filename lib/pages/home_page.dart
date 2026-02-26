@@ -444,6 +444,11 @@ class _HomePageState extends State<HomePage> {
                                                 invalidCount: file.invalidCount,
                                               ),
                                         ),
+                                        if (file.errorMessage == null && file.invalidCount > 0)
+                                          const Padding(
+                                            padding: EdgeInsets.only(top: 4),
+                                            child: Text(AppStrings.invalidValuesHint),
+                                          ),
                                         const SizedBox(height: 8),
                                         if (sortedNumbers.isEmpty)
                                           const Text('-')

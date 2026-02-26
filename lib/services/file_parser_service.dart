@@ -1,12 +1,15 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
 import 'package:sms/models/parse_result.dart';
+import 'package:sms/services/phone_number_normalizer.dart';
 
 class FileParserService {
   static const Set<String> supportedExtensions = {'xlsx', 'xls', 'csv', 'txt'};
+
+  final PhoneNumberNormalizer _phoneNumberNormalizer = PhoneNumberNormalizer();
 
   Future<ParseResult> parse({
     required String extension,
@@ -22,91 +25,115 @@ class FileParserService {
       case 'xls':
         return _parseExcel(bytes);
       default:
-        throw UnsupportedError("Қўллаб-қувватланмайдиган формат: .$extension");
+        throw UnsupportedError('Unsupported file format: .$extension');
     }
   }
 
   ParseResult _parseTxt(Uint8List bytes) {
     final content = utf8.decode(bytes, allowMalformed: true);
-    return _parseFromText(content);
+    final values = <String>[];
+    for (final line in const LineSplitter().convert(content)) {
+      values.addAll(line.split(RegExp(r'[,\t;]')));
+    }
+    return _parseValues(values);
   }
 
   ParseResult _parseCsv(Uint8List bytes) {
     final content = utf8.decode(bytes, allowMalformed: true);
     final rows = const CsvToListConverter(shouldParseNumbers: false).convert(content);
-    final buffer = StringBuffer();
+    final values = <dynamic>[];
     for (final row in rows) {
       for (final value in row) {
-        buffer.writeln('$value');
+        values.add(value);
       }
     }
-    return _parseFromText(buffer.toString());
+    return _parseValues(values);
   }
 
   ParseResult _parseExcel(Uint8List bytes) {
     final excel = Excel.decodeBytes(bytes);
-    final buffer = StringBuffer();
+    final values = <dynamic>[];
 
     for (final table in excel.tables.values) {
       for (final row in table.rows) {
         for (final cell in row) {
-          final text = _cellToText(cell);
-          if (text.isNotEmpty) {
-            buffer.writeln(text);
+          final value = _cellToValue(cell);
+          if (value != null) {
+            values.add(value);
           }
         }
       }
     }
 
-    return _parseFromText(buffer.toString());
+    return _parseValues(values);
   }
 
-  String _cellToText(dynamic cell) {
+  dynamic _cellToValue(dynamic cell) {
     if (cell == null) {
-      return '';
+      return null;
     }
+
     final dynamic value = cell.value;
     if (value == null) {
-      return '';
+      return null;
     }
-    if (value is String) {
+
+    if (value is String || value is num || value is DateTime || value is bool) {
       return value;
-    }
-    if (value is num || value is DateTime || value is bool) {
-      return value.toString();
     }
 
     try {
       final dynamic innerValue = value.value;
       if (innerValue != null) {
-        return innerValue.toString();
+        return innerValue;
       }
     } catch (_) {
-      return value.toString();
+      return value;
     }
 
-    return value.toString();
+    return value;
   }
 
-  ParseResult _parseFromText(String text) {
-    final candidates = _extractCandidates(text);
+  ParseResult _parseValues(Iterable<dynamic> values) {
     final validNumbers = <String>{};
     var invalidCount = 0;
 
-    for (final raw in candidates) {
-      final normalized = normalizeUzbekNumber(raw);
-      if (normalized == null) {
+    for (final value in values) {
+      final text = value?.toString() ?? '';
+      if (text.trim().isEmpty) {
+        continue;
+      }
+
+      final candidates = _extractCandidates(text);
+      if (candidates.isEmpty) {
+        final normalized = normalizeUzbekNumber(text);
+        if (normalized == null) {
+          invalidCount++;
+        } else {
+          validNumbers.add(normalized);
+        }
+        continue;
+      }
+
+      var hasValidInValue = false;
+      for (final candidate in candidates) {
+        final normalized = normalizeUzbekNumber(candidate);
+        if (normalized != null) {
+          validNumbers.add(normalized);
+          hasValidInValue = true;
+        }
+      }
+
+      if (!hasValidInValue) {
         invalidCount++;
-      } else {
-        validNumbers.add(normalized);
       }
     }
 
     return ParseResult(validNumbers: validNumbers, invalidCount: invalidCount);
   }
 
-  Set<String> _extractCandidates(String text) {
-    final matches = RegExp(r'(\+?\d[\d\s\-\(\)]{7,}\d)').allMatches(text);
+  List<String> _extractCandidates(String text) {
+    final matches = RegExp(r'(\+?\d[\d\s\u00A0\u2007\u202F\-\(\)]{7,}\d)').allMatches(text);
     final values = <String>{};
     for (final match in matches) {
       final value = match.group(0);
@@ -114,28 +141,10 @@ class FileParserService {
         values.add(value.trim());
       }
     }
-    return values;
+    return values.toList();
   }
 
   String? normalizeUzbekNumber(String input) {
-    var digits = input.replaceAll(RegExp(r'\D'), '');
-
-    if (digits.length == 12 && digits.startsWith('998')) {
-      return digits;
-    }
-
-    if (digits.length == 10 && digits.startsWith('0')) {
-      digits = digits.substring(1);
-    }
-
-    if (digits.length == 9) {
-      digits = '998$digits';
-    }
-
-    if (RegExp(r'^998\d{9}$').hasMatch(digits)) {
-      return digits;
-    }
-
-    return null;
+    return _phoneNumberNormalizer.normalize(input);
   }
 }

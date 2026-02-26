@@ -91,3 +91,27 @@ Manifestda quyidagilar ishlatiladi:
 - `Inconsistent JVM target` xatolari chiqsa, pluginlar Kotlin/Java targetlari mosligini tekshiring.
 - Build cache muammosida `build/` va `android/.gradle/` papkalarini tozalab qayta build qiling.
 - SMS yuborilmasa, qurilma ruxsatlari (`SMS`, `Notifications`) berilganini tekshiring.
+
+## Parser yangilanishlari (2026-02-26)
+
+Telefon raqam parseri quyidagicha yaxshilandi:
+
+- Quyidagi formatlar qabul qilinadi va bitta standartga keltiriladi:
+  - `+998901075508`
+  - `+998 90 107 55 08`
+  - `998901075508`
+  - `998 90 107 55 08`
+  - `90 107 55 08`
+  - `90-107-55-08`
+  - `(90) 107 55 08`
+- Yakuniy format doim `998XXXXXXXXX` (12 ta raqam).
+- Validatsiya regex: `^998\d{9}$`.
+- 9 xonali lokal formatga avtomatik `998` prefiksi qo'shiladi.
+- Barcha non-digit belgilar (`\D`) tozalanadi.
+- Oddiy space bilan birga maxsus bo'sh joy belgilar ham tozalanadi: `\u00A0`, `\u2007`, `\u202F`.
+- Excel numeric edge-case qo'llab-quvvatlanadi:
+  - `... .0` ko'rinishidagi qiymat to'g'ri butun songa aylantiriladi.
+  - E-notation qiymatlarda parse bo'lsa butun songa fallback aylantirish ishlaydi.
+- Parser oqimida har bir qiymat `toString()` orqali normalizatsiyadan o'tadi.
+- Valid raqamlar deduplicate qilinadi (`Set`), invalid qiymatlar alohida sanaladi.
+- UI'da valid/invalid sonlari aniq ko'rsatiladi va invalid holatda tushunarli kirillcha izoh chiqadi.

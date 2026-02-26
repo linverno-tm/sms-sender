@@ -15,6 +15,8 @@
   static const totalCount = 'Умумий сони';
   static const totalValidNumbers = 'Умумий тўғри рақамлар';
   static const totalInvalidValues = 'Умумий нотўғри қийматлар';
+  static const invalidValuesHint =
+      'Нотўғри қиймат бор. Рақамни 998XXXXXXXXX ёки 9 хонали форматда киритинг.';
   static const pending = 'Кутилмоқда';
   static const inProgress = 'Юборилмоқда';
   static const sent = 'Юборилди';
